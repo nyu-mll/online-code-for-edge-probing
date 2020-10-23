@@ -574,6 +574,13 @@ def main(cl_arguments):
     log.info("Loading tasks...")
     start_time = time.time()
     cuda_device = parse_cuda_list_arg(args.cuda)
+    #online-code testing
+    if args.get("online_code_preshuffle_seed", False) and args.get("online_code_data_split", False):
+        #if isinstance(args.online_code_data_split, str):
+        #        args.online_code_data_split = [float(percent) for percent in args.online_code_data_split.split(',')]
+        log.info("testing: online code arg type check")
+        log.info("%s %d", str(type(args.online_code_preshuffle_seed)), args.online_code_preshuffle_seed)
+        log.info("%s %s", str(type(args.online_code_data_split)), str(args.online_code_data_split))
     pretrain_tasks, target_tasks, vocab, word_embs = build_tasks(args, cuda_device)
     tasks = sorted(set(pretrain_tasks + target_tasks), key=lambda x: x.name)
     log.info("\tFinished loading tasks in %.3fs", time.time() - start_time)
@@ -677,11 +684,22 @@ def main(cl_arguments):
             assert ckpt_path is not None
             load_model_state(model, ckpt_path, cuda_device, skip_task_models=[], strict=strict)
             evaluate_and_write(args, model, [task], splits_to_write, cuda_device)
-
+    
+    # Compute the partial online code loss
+    if args.get("online_code_preshuffle_seed", False) and args.get("online_code_data_split", False):
+        assert len(target_tasks) == 1
+        task = target_tasks[0]
+        task_params = get_model_attribute(model, "_get_task_params", cuda_device)
+        task_to_use = task_params(task.name).get("use_classifier", task.name)
+        ckpt_path = get_best_checkpoint_path(args, "eval", task_to_use)
+        assert ckpt_path is not None
+        load_model_state(model, ckpt_path, cuda_device, skip_task_models=[], strict=strict)
+        evaluate.evaluate_online_code(model, task, args.batch_size, cuda_device, args.run_dir)
+ 
     if args.delete_checkpoints_when_done and not args.keep_all_checkpoints:
         log.info("Deleting all checkpoints.")
         delete_all_checkpoints(args.run_dir)
-
+        
     log.info("Done!")
 
 

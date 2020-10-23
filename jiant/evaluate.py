@@ -3,6 +3,7 @@ import json
 import logging as log
 import os
 import time
+import math
 from collections import defaultdict
 from csv import QUOTE_MINIMAL, QUOTE_NONE
 from typing import Dict, Iterable, List, Sequence, Tuple
@@ -166,6 +167,39 @@ def evaluate(
 
     return all_metrics, all_preds
 
+def evaluate_online_code(model, task, batch_size, cuda_device, run_dir):
+    log.info("Start computing Online Code Loss")
+    max_data_points = task.example_counts["test"]
+    test_generator = BasicIterator(batch_size, instances_per_epoch=max_data_points)(
+        task.get_instance_iterable(split_name="test"), num_epochs=1, shuffle=False
+    )
+    n_test_batches = math.ceil(max_data_points / batch_size)
+    log.info('testing: max_data_points: %d, batch_size: %d, n_test_batches: %d', max_data_points, batch_size, n_test_batches)
+    total_loss, n_examples, batch_num = 0.0, 0, 0
+    for batch in test_generator:
+        #log.info('testing, labels shape: %s', str(batch['labels'].shape))
+        batch_num += 1
+        with torch.no_grad():
+            if isinstance(cuda_device, int):
+                    batch = move_to_device(batch, cuda_device)
+            out = model.forward(task=task, batch=batch)
+        loss = get_output_attribute(out, "loss", cuda_device, "mean")
+        n_exs = get_output_attribute(out, "n_exs", cuda_device)
+        log.info('mean_loss: %s, n_exs: %d', str(out['loss']), n_exs)
+        log.info('testing, #labels: %d', batch['labels'].shape[-1])
+        total_loss += loss*n_exs*batch['labels'].shape[-1]
+        # in multi-GPU mode n_exs is expected to be a tensor, w/ single-GPU an int is expected:
+        if isinstance(n_exs, torch.Tensor):
+            n_examples += n_exs.item()
+        elif isinstance(n_exs, int):
+            n_examples += n_exs
+        else:
+            raise ValueError("n_exs is type " + type(n_exs) + ", int or Tensor is expected.")
+    log.info("Online Code loss computed: %s", str(total_loss))
+    output_total_loss = {"online_code_loss": total_loss, 'n_examples': n_examples}
+    output_file = os.path.join(os.path.split(run_dir)[0],"results.tsv")
+    log.info("testing, output file path: %s", output_file)
+    write_results(output_total_loss, output_file, "online_code_partial_result")
 
 def write_preds(
     tasks: Iterable[tasks_module.Task], all_preds, pred_dir, split_name, strict_glue_format=False

@@ -5,6 +5,8 @@ import logging as log
 import os
 import torch
 from typing import Dict, Iterable, List, Sequence, Type
+import random
+import math
 
 # Fields for instance processing
 from allennlp.data import Instance
@@ -149,17 +151,34 @@ class EdgeProbingTask(Task):
                 record["preds"][key] = val
         return record
 
-    def load_data(self):
+    def load_data(self, args=None):
+        # if the user requires to calculate the online code
         self.all_labels = list(utils.load_lines(self.label_file))
         self.n_classes = len(self.all_labels)
         iters_by_split = collections.OrderedDict()
-        for split, filename in self._files_by_split.items():
-            #  # Lazy-load using RepeatableIterator.
-            #  loader = functools.partial(utils.load_json_data,
-            #                             filename=filename)
-            #  iter = serialize.RepeatableIterator(loader)
-            iter = list(self._stream_records(filename))
-            iters_by_split[split] = iter
+        if args!=None and args.get("online_code_preshuffle_seed", False) and args.get("online_code_data_split", False):
+            online_code_data_split = [float(percent) for percent in args.online_code_data_split.split(',')]
+            assert 'train' in self._files_by_split and 'val' in self._files_by_split
+            full_train = list(self._stream_records(self._files_by_split['train']))
+            random.Random(args.online_code_preshuffle_seed).shuffle(full_train)
+            log.info('testing, len(full_train): %d', len(full_train))
+            if online_code_data_split==[0,1,2]:
+                iters_by_split['val'] = list(self._stream_records(self._files_by_split['val']))
+                iters_by_split['train'] = full_train
+                iters_by_split['test'] = full_train
+            else:
+                iters_by_split['val'] = list(self._stream_records(self._files_by_split['val']))
+                iters_by_split['train'] = full_train[int(math.ceil(online_code_data_split[0]*len(full_train))):int(math.ceil(online_code_data_split[1]*len(full_train)))]
+                iters_by_split['test'] = full_train[int(math.ceil(online_code_data_split[1]*len(full_train))):int(math.ceil(online_code_data_split[2]*len(full_train)))]
+            #iters_by_split['test'] = list(self._stream_records(self._files_by_split['test']))
+        else:
+            for split, filename in self._files_by_split.items():
+                #  # Lazy-load using RepeatableIterator.
+                #  loader = functools.partial(utils.load_json_data,
+                #                             filename=filename)
+                #  iter = serialize.RepeatableIterator(loader)
+                iter = list(self._stream_records(filename))
+                iters_by_split[split] = iter
         self._iters_by_split = iters_by_split
 
     def update_metrics(self, out, batch):
