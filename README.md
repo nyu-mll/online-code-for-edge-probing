@@ -1,11 +1,12 @@
 # Online Code For Edge Probing
 
-This jiant1 repo supports estimating online codelength on the edge probing tasks.
+This fork of jiant1 supports estimating online codelength on the edge probing tasks.
 
 ## A 3-step Guide:
 
 ### Step 1 Background and Basics
-This repo is based on [jiant1](https://github.com/nyu-mll/jiant-v1-legacy). If you are unfamiliar with jiant, We suggest you set up the jiant environment following this [tutorial](https://github.com/nyu-mll/jiant-v1-legacy/blob/master/tutorials/setup_tutorial.md). We strongly recommend running the standard edge probing experiment at least once folloing tutorial [here](https://github.com/nyu-mll/pretraining-learning-curves) before running the online coding experiment. It teaches you how to set the envirnoment variables, download and preprocess the data, set config flags, etc.
+This repo is based on [jiant1](https://github.com/nyu-mll/jiant-v1-legacy). If you are unfamiliar with jiant, We suggest you set up the jiant environment following this [tutorial](https://github.com/nyu-mll/jiant-v1-legacy/blob/master/tutorials/setup_tutorial.md). 
+We strongly recommend running the standard edge probing experiment at least once folloing tutorial [here](https://github.com/nyu-mll/pretraining-learning-curves) before running the online coding experiment. It teaches you how to set the envirnoment variables, download and preprocess the data, set config flags, etc.
 
 ### Step 2 Main Experiments(Data Transmission)
 
